@@ -166,6 +166,11 @@ void loop(){
 			RudderRight = 0;
 		}
 
+		//0x15 center
+		if(outputNum = 4){
+			center = 0;
+		}
+		
 		rudder_control();
 
 		//set the values back to 1 as a "reset" after the transmission via the rudder_control() method
@@ -183,11 +188,6 @@ void loop(){
 		sails_control();
 		SailsOut = 1;
 		SailsIn = 1;
-
-		//0x15 center
-		if(outputNum = 4){
-			center = 0;
-		}
 	
 		}
 	}
