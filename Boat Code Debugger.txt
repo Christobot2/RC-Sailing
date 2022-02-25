@@ -1,0 +1,241 @@
+#include <eRCaGuy_PPM_Writer.h>
+const byte CH1 = 0,
+           CH2 = 1,
+           CH3 = 2,
+           CH4 = 3,
+           CH5 = 4,
+           CH6 = 5;
+
+#define SailsOutSwitchPin 3                 // D3 Ring
+#define SailsInSwitchPin 2                  // D2 Tip
+int SailsIn;                                // SailsIn = Decrement
+int SailsOut;                               // SailsOut = Increment
+int SailsSyncDelay = 5;
+int SailsSteps = 16;
+int SailsPulseWidth = 1500;
+int SailsPulseWidthInc = 40;
+int SailsCountMin = -8;
+int SailsCountMax = +8;
+int SailsCount = 0;
+int SailsCountDelay = 25;
+
+#define RudderLeftSwitchPin 17              // A3 Ring
+#define RudderRightSwitchPin 16             // A2 Tip
+int RudderLeft;                             // RudderLeft = Decrement
+int RudderRight;                            // RudderRight = Increment
+int RudderSyncDelay = 5;
+int RudderSteps = 16;
+int RudderPulseWidth = 1500;
+int RudderPulseWidthInc = 40;
+int RudderCountMin = -8;
+int RudderCountMax = +8;
+int RudderCount = 0;
+int RudderCountDelay = 25;
+int center = 1;
+byte com = 0;
+
+void sails_control()
+{
+  if (SailsIn == 0)
+  {
+    SailsCount = SailsCount - 1;
+	//if somehow the sailcount gets below the minimum, force it to be the minimum (-8)
+    if (SailsCount < SailsCountMin)
+    {
+      SailsCount = SailsCountMin;
+    }
+  }
+
+  if (SailsOut == 0)
+  {
+    SailsCount = SailsCount + 1;
+	//if somehow the sailcount gets above the maximum, force it to be the maximum (8)
+    if (SailsCount > SailsCountMax)
+    {
+      SailsCount = SailsCountMax;
+    }
+  }
+
+  // New 02-20-2021 : See Adaptive RC Sailer PPM Design Notes
+  PPMWriter.setChannelVal(CH3, (SailsPulseWidth + SailsCount * SailsPulseWidthInc) * 2);
+  if (SailsIn == 0 || SailsOut == 0)
+  {
+    //Serial.print("Sails: Steps =  "); Serial.print(SailsCount);
+    //Serial.print("  Control Pulse (msec) = "); Serial.println(SailsPulseWidth + SailsCount * SailsPulseWidthInc);
+  }
+  delay(SailsCountDelay);
+}//end sails_Control
+
+void rudder_control()
+{
+  if (RudderLeft == 0)
+  {
+    RudderCount = RudderCount - 1;
+	//if ruddercount is lower than the minimum, force it to the minimum (-8)
+    if (RudderCount <= RudderCountMin)
+    {
+      RudderCount = RudderCountMin;
+    }
+  }
+
+  if (RudderRight == 0)
+  {
+    RudderCount = RudderCount + 1;
+	//if ruddercount is higher than the maximum, force it to the maximum (+8)
+    if (RudderCount >= RudderCountMax)
+    {
+      RudderCount = RudderCountMax;
+    }
+  }
+
+  if(center == 0){
+
+	if(RudderCount > 0){
+		while(RudderCount > 0){
+			RudderCount = RudderCount - 1;
+			Serial.print("RudderCount: ");
+			Serial.println(RudderCount);
+			PPMWriter.setChannelVal(CH1, (RudderPulseWidth + RudderCount * RudderPulseWidthInc) * 2);
+			delay(2000);
+		}
+	}
+
+	if(countdown < 0){
+		while(RudderCount < 0){
+			RudderCount = RudderCount + 1;
+			PPMWriter.setChannelVal(CH1, (RudderPulseWidth + RudderCount * RudderPulseWidthInc) * 2);
+			Serial.print("RudderCount: ");
+			Serial.println(RudderCount);
+			delay(2000);
+		}
+	}
+   }
+
+  // New 02-20-2021 : See Adaptive RC Sailer PPM Design Notes
+  PPMWriter.setChannelVal(CH1, (RudderPulseWidth + RudderCount * RudderPulseWidthInc) * 2);
+  if (RudderLeft == 0 || RudderRight == 0)
+  {
+    //Serial.print("Rudder: Steps =  "); Serial.print(RudderCount);
+    //Serial.print("  Control Pulse (msec) = "); Serial.println(RudderPulseWidth + RudderCount * RudderPulseWidthInc);
+  }
+  delay(RudderCountDelay);
+}//end rudder_control
+
+void setup(){
+
+//setup A0 as an input to check and use as the "ready to start" switch
+pinMode(A0, INPUT);
+pinMode(A1, INPUT);
+Serial.begin(9600);
+
+//while the A0 test pin is not grounded, keep printing a line and do not continue until it is 0
+while(analogRead(A0) != 0){
+Serial.println("Waiting for confirmation. Insert Geeetech RX and TX wires and flip switch to continue.");
+delay(2000);
+}
+
+delay(2000); 
+Serial.write(0xAA); //header byte 
+Serial.write(0x37); //key byte of x37 means switch to compact mode 
+
+Serial.println("Header xAA37 sent");
+
+delay(1000); 
+Serial.write(0xAA); //header byte 
+Serial.write(0x21); //key byte of 21 means import group 1 commands and be ready for voice 
+
+Serial.println("Header xAA21 sent");
+
+	//we may actually need these pins, not sure yet without physical device testing
+  //pinMode(SailsInSwitchPin, INPUT_PULLUP);
+  //pinMode(SailsOutSwitchPin, INPUT_PULLUP);
+  //pinMode(RudderLeftSwitchPin, INPUT_PULLUP);
+  //pinMode(RudderRightSwitchPin, INPUT_PULLUP);
+
+  // Initially Set Channels 1 thru 6 to 1500 usec
+  // Channel 3 = Sails; Channel 4 = Rudder
+  // PPMWriter.setPPMPolarity(PPM_WRITER_INVERTED);
+
+	//set this to set the right number of channels for the remote
+  PPMWriter.setNumChannels(6);
+  PPMWriter.setChannelVal(CH1, 1500 * 2);
+  PPMWriter.setChannelVal(CH2, 1500 * 2);
+  PPMWriter.setChannelVal(CH3, 1500 * 2);
+  PPMWriter.setChannelVal(CH4, 1500 * 2);
+  PPMWriter.setChannelVal(CH5, 1500 * 2);
+  PPMWriter.setChannelVal(CH6, 1500 * 2);
+
+  Serial.write("PPMWriter set all channel values");
+  // Start PPM Train
+  PPMWriter.begin();
+
+  Serial.println("PPM train began successfully");
+}
+
+
+void loop(){
+
+while(Serial.available()) 
+
+{ 
+
+//com = Serial.read(); 
+com = 0x11;
+
+switch(com) 
+
+{ 
+
+case 0x11: 
+
+if(analogRead(A1) == 0){
+Serial.println("Left"); 
+RudderLeft = 0;
+delay(5000);
+}
+break; 
+
+case 0x12: 
+
+Serial.println("Right"); 
+RudderRight = 0;
+
+break; 
+
+case 0x13: 
+
+Serial.println("Sails in"); 
+SailsIn = 0;
+
+break; 
+
+case 0x14: 
+
+Serial.println("Sails out"); 
+SailsOut = 0;
+
+break; 
+
+case 0x15: 
+
+Serial.println("Center"); 
+center = 0;
+
+break; 
+
+} 
+
+rudder_control();
+RudderLeft = 1;
+RudderRight = 1;
+center = 1;
+Serial.println("Rudder values reset to 1");
+
+sail_control();
+SailsOut = 1;
+SailsIn = 1;
+Serial.println("Sail values reset to 1");
+
+} 
+
+}
